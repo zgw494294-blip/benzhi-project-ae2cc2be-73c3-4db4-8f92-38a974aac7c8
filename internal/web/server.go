@@ -3,7 +3,9 @@ package web
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"ovencheck/internal/core"
 	"ovencheck/internal/measurements"
@@ -73,7 +75,17 @@ func notFoundJSON(w http.ResponseWriter, err error) {
 func decode(r *http.Request, v any) error {
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
-	return d.Decode(v)
+	if err := d.Decode(v); err != nil {
+		return err
+	}
+	// 请求体必须恰好包含一个完整 JSON 值并读到 EOF；第二个值或任何非空白
+	// 尾随内容都属于客户端错误，且在此错误返回前不得触碰持久状态。
+	var extra struct{}
+	err := d.Decode(&extra)
+	if err == nil || !errors.Is(err, io.EOF) {
+		return fmt.Errorf("请求体必须只包含一个 JSON 文档")
+	}
+	return nil
 }
 func (s *Server) batches(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {

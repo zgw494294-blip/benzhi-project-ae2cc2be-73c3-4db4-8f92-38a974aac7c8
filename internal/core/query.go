@@ -18,7 +18,7 @@ func (s *Store) Stage(id, stageID string) (HeatingStage, bool) {
 	}
 	for _, st := range b.Stages {
 		if st.ID == stageID {
-			return st, true
+			return cloneStage(st), true
 		}
 	}
 	return HeatingStage{}, false

@@ -83,7 +83,7 @@ func (s *Store) List() []KilnBatch {
 	defer s.mu.RUnlock()
 	out := make([]KilnBatch, 0, len(s.batches))
 	for _, b := range s.batches {
-		out = append(out, *b)
+		out = append(out, cloneBatch(*b))
 	}
 	return out
 }
@@ -94,7 +94,7 @@ func (s *Store) Get(id string) (KilnBatch, bool) {
 	if !ok {
 		return KilnBatch{}, false
 	}
-	return *b, true
+	return cloneBatch(*b), true
 }
 func (s *Store) mutate(id string, expected int, fn func(*KilnBatch) error) error {
 	s.mu.Lock()
@@ -121,9 +121,10 @@ func (s *Store) Create(name, kiln, lining, operator, engineer string) (KilnBatch
 	defer s.mu.Unlock()
 	now := time.Now()
 	b := KilnBatch{ID: NewID("batch"), Name: name, KilnCode: kiln, LiningMaterial: lining, Operator: operator, Engineer: engineer, Status: StatusDraft, Version: 1, CreatedAt: now, Stages: []HeatingStage{}, Readings: []TemperatureReading{}, Actions: []DeviationAction{}, PendingRetests: map[string]RetestState{}}
-	s.batches[b.ID] = &b
+	stored := cloneBatch(b)
+	s.batches[b.ID] = &stored
 	_ = appendAudit(s.auditPath, AuditEvent{Action: "create_batch", BatchID: b.ID, Version: b.Version})
-	return b, s.saveLocked()
+	return cloneBatch(b), s.saveLocked()
 }
 func (s *Store) AddStages(id string, expected int, stages []HeatingStage) error {
 	return s.mutate(id, expected, func(b *KilnBatch) error {
@@ -239,11 +240,7 @@ func (s *Store) PendingRetests(id string) map[string]RetestState {
 	if !ok {
 		return nil
 	}
-	out := map[string]RetestState{}
-	for k, v := range b.PendingRetests {
-		out[k] = v
-	}
-	return out
+	return cloneRetests(b.PendingRetests)
 }
 
 func (s *Store) ClearRetest(id string, expected int, stageID string) error {

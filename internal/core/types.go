@@ -27,7 +27,19 @@ type KilnBatch struct {
 	Readings       []TemperatureReading   `json:"readings"`
 	Actions        []DeviationAction      `json:"actions"`
 	Certificate    *ReleaseCertificate    `json:"certificate,omitempty"`
+	Review         *ReviewRecord          `json:"review,omitempty"`
 	PendingRetests map[string]RetestState `json:"pendingRetests,omitempty"`
+}
+
+// ReviewRecord persists a quality review decision (approved or rejected) so
+// the reviewer, normalized comment and decision time survive snapshot reload.
+// It is independent from ReleaseCertificate: rejections are recorded here
+// without being represented as a release certificate.
+type ReviewRecord struct {
+	Decision      string    `json:"decision"`
+	Reviewer      string    `json:"reviewer"`
+	ReviewComment string    `json:"reviewComment"`
+	DecidedAt     time.Time `json:"decidedAt"`
 }
 
 type RetestState struct {

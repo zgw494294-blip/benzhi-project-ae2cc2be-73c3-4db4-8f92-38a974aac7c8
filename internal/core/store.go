@@ -267,11 +267,14 @@ func (s *Store) SetReview(id string, expected int, status, reviewer, comment str
 			return errors.New("无效审核决定")
 		}
 		b.Status = status
+		now := time.Now()
 		if status == StatusApproved {
-			now := time.Now()
 			b.ApprovedAt = &now
 			b.Certificate = cert
+		} else {
+			b.Certificate = nil
 		}
+		b.Review = &ReviewRecord{Decision: status, Reviewer: reviewer, ReviewComment: comment, DecidedAt: now}
 		return nil
 	})
 }

@@ -28,7 +28,9 @@ func AuditLines(batch core.KilnBatch) []AuditLine {
 	for _, reading := range batch.Readings {
 		lines = append(lines, AuditLine{At: reading.RecordedAt, Kind: "reading", Actor: reading.Source, StageID: reading.StageID, Text: fmt.Sprintf("测点 %s 读数 %.2f°C", reading.SensorID, reading.Celsius)})
 	}
-	if batch.Certificate != nil {
+	if batch.Review != nil {
+		lines = append(lines, AuditLine{At: batch.Review.DecidedAt, Kind: "review", Actor: batch.Review.Reviewer, Text: batch.Review.ReviewComment})
+	} else if batch.Certificate != nil {
 		lines = append(lines, AuditLine{At: batch.Certificate.IssuedAt, Kind: "review", Actor: batch.Certificate.Reviewer, Text: batch.Certificate.ReviewComment})
 	}
 	sort.SliceStable(lines, func(i, j int) bool { return lines[i].At.Before(lines[j].At) })

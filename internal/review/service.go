@@ -65,16 +65,18 @@ func (s *Service) Decide(id string, expected int, reviewer, decision, comment st
 		Report validation.BatchReport
 	}{b, report})
 	sum := sha256.Sum256(snap)
-	cert := core.ReleaseCertificate{ID: core.NewID("cert"), BatchID: id, BatchVersion: b.Version, Decision: decision, Reviewer: reviewer, ReviewComment: comment, Digest: hex.EncodeToString(sum[:]), IssuedAt: time.Now(), Snapshot: string(snap)}
+	issuedAt := time.Now()
 	var certPtr *core.ReleaseCertificate
+	var cert core.ReleaseCertificate
 	if decision == core.StatusApproved {
+		cert = core.ReleaseCertificate{ID: core.NewID("cert"), BatchID: id, BatchVersion: b.Version, Decision: decision, Reviewer: reviewer, ReviewComment: comment, Digest: hex.EncodeToString(sum[:]), IssuedAt: issuedAt, Snapshot: string(snap)}
 		certPtr = &cert
 	}
 	if err := s.Store.SetReview(id, expected, decision, reviewer, comment, certPtr); err != nil {
 		return core.ReleaseCertificate{}, err
 	}
 	if decision != core.StatusApproved {
-		return core.ReleaseCertificate{BatchID: id, BatchVersion: b.Version, Decision: decision, Reviewer: reviewer, ReviewComment: comment}, nil
+		return core.ReleaseCertificate{BatchID: id, BatchVersion: b.Version, Decision: decision, Reviewer: reviewer, ReviewComment: comment, IssuedAt: issuedAt}, nil
 	}
 	return cert, nil
 }
@@ -143,5 +145,8 @@ func VerifyCertificate(c core.ReleaseCertificate) bool {
 	return hex.EncodeToString(h[:]) == c.Digest
 }
 func CertificateText(c core.ReleaseCertificate) string {
+	if c.Decision != core.StatusApproved {
+		return fmt.Sprintf("工业窑炉烘炉审核记录\n批次: %s\n批次版本: %d\n决定: %s\n审核人: %s\n审核意见: %s\n", c.BatchID, c.BatchVersion, c.Decision, c.Reviewer, c.ReviewComment)
+	}
 	return fmt.Sprintf("工业窑炉烘炉合格证\n批次: %s\n批次版本: %d\n决定: %s\n审核人: %s\n审核意见: %s\n摘要校验值: %s\n签发时间: %s\n", c.BatchID, c.BatchVersion, c.Decision, c.Reviewer, c.ReviewComment, c.Digest, c.IssuedAt.Format(time.RFC3339))
 }

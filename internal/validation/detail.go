@@ -67,7 +67,14 @@ func StageWindow(batch core.KilnBatch, stageID string) (time.Time, time.Time, bo
 	return start, end, found
 }
 func DetailedStage(batch core.KilnBatch, stage core.HeatingStage) []SensorResult {
-	rs := measurements.StageReadings(batch, stage.ID)
+	return DetailedStageReadings(stage, measurements.StageReadings(batch, stage.ID))
+}
+
+// DetailedStageReadings evaluates a stage against an explicit set of readings,
+// instead of pulling every reading for the stage from the batch. Callers that
+// need to judge a sub-window (such as a post-action retest window) can filter
+// readings before invoking this helper so the result reflects only that window.
+func DetailedStageReadings(stage core.HeatingStage, rs []core.TemperatureReading) []SensorResult {
 	by := map[string][]core.TemperatureReading{}
 	for _, r := range rs {
 		by[r.SensorID] = append(by[r.SensorID], r)

@@ -101,18 +101,31 @@ func (s *Service) RefreshRetests(id string) error {
 	if len(b.PendingRetests) == 0 {
 		return nil
 	}
-	report := validation.Evaluate(b)
-	for stageID := range b.PendingRetests {
-		for _, stage := range report.Stages {
-			if stage.StageID == stageID && stage.Compliant {
-				current, ok := s.Store.Get(id)
-				if !ok {
-					return errors.New("批次不存在")
-				}
-				if err := s.Store.ClearRetest(id, current.Version, stageID); err != nil {
-					return err
-				}
+	stages := map[string]core.HeatingStage{}
+	for _, st := range b.Stages {
+		stages[st.ID] = st
+	}
+	for stageID, pending := range b.PendingRetests {
+		stage, ok := stages[stageID]
+		if !ok {
+			continue
+		}
+		window := make([]core.TemperatureReading, 0)
+		for _, r := range b.Readings {
+			if r.StageID == stageID && r.RecordedAt.After(pending.RequiredAfter) {
+				window = append(window, r)
 			}
+		}
+		rep := validation.EvaluateStage(stage, window)
+		if !rep.Compliant {
+			continue
+		}
+		current, ok := s.Store.Get(id)
+		if !ok {
+			return errors.New("批次不存在")
+		}
+		if err := s.Store.ClearRetest(id, current.Version, stageID); err != nil {
+			return err
 		}
 	}
 	return nil

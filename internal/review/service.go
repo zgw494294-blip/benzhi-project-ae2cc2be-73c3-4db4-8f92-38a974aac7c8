@@ -9,6 +9,7 @@ import (
 	"ovencheck/internal/core"
 	"ovencheck/internal/validation"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,18 +26,28 @@ func New(s *core.Store) *Service {
 	return &Service{Store: s, reportCache: map[string]validation.BatchReport{}}
 }
 
+// reportFor returns the validation report for the given batch, keyed by batch
+// ID and version so that any version bump (new readings, deviations, retest
+// clearance, review) invalidates a previously cached report. This keeps the
+// report aligned with the current batch state when evidence is inspected
+// before the batch is finalized and later approvals are submitted.
 func (s *Service) reportFor(batch core.KilnBatch) validation.BatchReport {
+	key := reportCacheKey(batch.ID, batch.Version)
 	s.reportMu.RLock()
-	report, ok := s.reportCache[batch.ID]
+	report, ok := s.reportCache[key]
 	s.reportMu.RUnlock()
 	if ok {
 		return report
 	}
 	report = validation.Evaluate(batch)
 	s.reportMu.Lock()
-	s.reportCache[batch.ID] = report
+	s.reportCache[key] = report
 	s.reportMu.Unlock()
 	return report
+}
+
+func reportCacheKey(batchID string, version int) string {
+	return batchID + ":" + strconv.Itoa(version)
 }
 func (s *Service) RecordDeviation(id string, expected int, stageID, kind, reason, action, by string, retest bool) error {
 	return s.RecordDeviationAt(id, expected, stageID, kind, reason, action, by, retest, time.Time{})

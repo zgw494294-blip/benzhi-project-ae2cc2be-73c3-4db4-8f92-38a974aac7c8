@@ -109,13 +109,20 @@ func (s *Store) mutate(id string, expected int, fn func(*KilnBatch) error) error
 	if b.Version != expected {
 		return fmt.Errorf("版本冲突: 当前版本 %d", b.Version)
 	}
-	before := *b
+	before, err := CloneBatch(*b)
+	if err != nil {
+		return fmt.Errorf("快照备份失败: %w", err)
+	}
 	if err := fn(b); err != nil {
 		return err
 	}
 	b.Version++
 	_ = appendAudit(s.auditPath, AuditEvent{Action: "mutate_batch", BatchID: id, Version: b.Version})
 	if err := s.saveLocked(); err != nil {
+		// Restore the pre-mutation snapshot in full so that a failed persist
+		// (for example a snapshot parent directory that became unavailable at
+		// runtime) does not leave partial mutations such as a cleared retest
+		// marker behind.
 		*b = before
 		return err
 	}

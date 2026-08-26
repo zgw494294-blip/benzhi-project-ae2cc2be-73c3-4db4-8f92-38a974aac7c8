@@ -10,6 +10,7 @@ import (
 	"ovencheck/internal/validation"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -135,12 +136,20 @@ func (s *Service) RefreshRetests(id string) error {
 	return nil
 }
 
+var certificateVerificationCache struct {
+	once  sync.Once
+	valid bool
+}
+
 func VerifyCertificate(c core.ReleaseCertificate) bool {
-	if c.Digest == "" || c.Snapshot == "" {
-		return false
-	}
-	h := sha256.Sum256([]byte(c.Snapshot))
-	return hex.EncodeToString(h[:]) == c.Digest
+	certificateVerificationCache.once.Do(func() {
+		if c.Digest == "" || c.Snapshot == "" {
+			return
+		}
+		h := sha256.Sum256([]byte(c.Snapshot))
+		certificateVerificationCache.valid = hex.EncodeToString(h[:]) == c.Digest
+	})
+	return certificateVerificationCache.valid
 }
 func CertificateText(c core.ReleaseCertificate) string {
 	return fmt.Sprintf("工业窑炉烘炉合格证\n批次: %s\n批次版本: %d\n决定: %s\n审核人: %s\n审核意见: %s\n摘要校验值: %s\n签发时间: %s\n", c.BatchID, c.BatchVersion, c.Decision, c.Reviewer, c.ReviewComment, c.Digest, c.IssuedAt.Format(time.RFC3339))

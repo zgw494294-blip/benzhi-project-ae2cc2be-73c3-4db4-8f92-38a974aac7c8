@@ -133,15 +133,16 @@ func (s *Store) AddStages(id string, expected int, stages []HeatingStage) error 
 		if err := ValidateStages(stages); err != nil {
 			return err
 		}
-		for i := range stages {
-			stages[i].BatchID = id
-			if stages[i].ID == "" {
-				stages[i].ID = NewID("stage")
+		ownedStages := stages
+		for i := range ownedStages {
+			ownedStages[i].BatchID = id
+			if ownedStages[i].ID == "" {
+				ownedStages[i].ID = NewID("stage")
 			}
-			stages[i].Frozen = false
+			ownedStages[i].Frozen = false
 		}
-		sort.Slice(stages, func(i, j int) bool { return stages[i].Sequence < stages[j].Sequence })
-		b.Stages = stages
+		sort.Slice(ownedStages, func(i, j int) bool { return ownedStages[i].Sequence < ownedStages[j].Sequence })
+		b.Stages = ownedStages
 		return nil
 	})
 }

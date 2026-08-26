@@ -103,24 +103,7 @@ func (s *Service) RefreshRetests(id string) error {
 	}
 	report := validation.Evaluate(b)
 	for stageID := range b.PendingRetests {
-		pending := b.PendingRetests[stageID]
-		trial := b
-		trial.Readings = make([]core.TemperatureReading, 0, len(b.Readings))
-		for _, reading := range b.Readings {
-			if reading.StageID != stageID || reading.RecordedAt.After(pending.RequiredAfter) {
-				trial.Readings = append(trial.Readings, reading)
-			}
-		}
-		trialReport := validation.Evaluate(trial)
 		for _, stage := range report.Stages {
-			if stage.StageID == stageID {
-				for _, candidate := range trialReport.Stages {
-					if candidate.StageID == stageID {
-						stage = candidate
-						break
-					}
-				}
-			}
 			if stage.StageID == stageID && stage.Compliant {
 				current, ok := s.Store.Get(id)
 				if !ok {

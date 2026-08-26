@@ -109,12 +109,17 @@ func (s *Store) mutate(id string, expected int, fn func(*KilnBatch) error) error
 	if b.Version != expected {
 		return fmt.Errorf("版本冲突: 当前版本 %d", b.Version)
 	}
+	before := *b
 	if err := fn(b); err != nil {
 		return err
 	}
 	b.Version++
 	_ = appendAudit(s.auditPath, AuditEvent{Action: "mutate_batch", BatchID: id, Version: b.Version})
-	return s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		*b = before
+		return err
+	}
+	return nil
 }
 func (s *Store) Create(name, kiln, lining, operator, engineer string) (KilnBatch, error) {
 	s.mu.Lock()

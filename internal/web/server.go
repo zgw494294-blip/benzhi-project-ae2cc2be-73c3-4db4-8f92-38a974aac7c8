@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"ovencheck/internal/core"
 	"ovencheck/internal/measurements"
@@ -17,9 +18,10 @@ import (
 var assets embed.FS
 
 type Server struct {
-	Store  *core.Store
-	Review *review.Service
-	mux    *http.ServeMux
+	Store        *core.Store
+	Review       *review.Service
+	mux          *http.ServeMux
+	certificates certificateReaderCache
 }
 
 func NewServer(store *core.Store) *Server {
@@ -362,7 +364,9 @@ func (s *Server) certificate(w http.ResponseWriter, r *http.Request) {
 		if b.Certificate != nil && b.Certificate.ID == id {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			w.Header().Set("Content-Disposition", "attachment; filename=oven-certificate.txt")
-			w.Write([]byte(review.CertificateText(*b.Certificate)))
+			body := s.certificates.open(*b.Certificate)
+			defer body.Close()
+			_, _ = io.Copy(w, body)
 			return
 		}
 	}

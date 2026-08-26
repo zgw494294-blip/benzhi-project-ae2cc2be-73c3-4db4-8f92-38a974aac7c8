@@ -122,8 +122,13 @@ func (s *Store) Create(name, kiln, lining, operator, engineer string) (KilnBatch
 	now := time.Now()
 	b := KilnBatch{ID: NewID("batch"), Name: name, KilnCode: kiln, LiningMaterial: lining, Operator: operator, Engineer: engineer, Status: StatusDraft, Version: 1, CreatedAt: now, Stages: []HeatingStage{}, Readings: []TemperatureReading{}, Actions: []DeviationAction{}, PendingRetests: map[string]RetestState{}}
 	s.batches[b.ID] = &b
-	_ = appendAudit(s.auditPath, AuditEvent{Action: "create_batch", BatchID: b.ID, Version: b.Version})
-	return b, s.saveLocked()
+	if err := s.saveLocked(); err != nil {
+		return b, err
+	}
+	if err := appendAudit(s.auditPath, AuditEvent{Action: "create_batch", BatchID: b.ID, Version: b.Version}); err != nil {
+		return b, fmt.Errorf("追加审计记录: %w", err)
+	}
+	return b, nil
 }
 func (s *Store) AddStages(id string, expected int, stages []HeatingStage) error {
 	return s.mutate(id, expected, func(b *KilnBatch) error {

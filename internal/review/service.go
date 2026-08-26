@@ -10,12 +10,34 @@ import (
 	"ovencheck/internal/validation"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
-type Service struct{ Store *core.Store }
+type Service struct {
+	Store *core.Store
 
-func New(s *core.Store) *Service { return &Service{Store: s} }
+	reportMu    sync.RWMutex
+	reportCache map[string]validation.BatchReport
+}
+
+func New(s *core.Store) *Service {
+	return &Service{Store: s, reportCache: map[string]validation.BatchReport{}}
+}
+
+func (s *Service) reportFor(batch core.KilnBatch) validation.BatchReport {
+	s.reportMu.RLock()
+	report, ok := s.reportCache[batch.ID]
+	s.reportMu.RUnlock()
+	if ok {
+		return report
+	}
+	report = validation.Evaluate(batch)
+	s.reportMu.Lock()
+	s.reportCache[batch.ID] = report
+	s.reportMu.Unlock()
+	return report
+}
 func (s *Service) RecordDeviation(id string, expected int, stageID, kind, reason, action, by string, retest bool) error {
 	return s.RecordDeviationAt(id, expected, stageID, kind, reason, action, by, retest, time.Time{})
 }
@@ -48,7 +70,7 @@ func (s *Service) Decide(id string, expected int, reviewer, decision, comment st
 	if !ok {
 		return core.ReleaseCertificate{}, errors.New("批次不存在")
 	}
-	report := validation.Evaluate(b)
+	report := s.reportFor(b)
 	if err := ValidateDecision(DecisionRequest{Reviewer: reviewer, Decision: decision, Comment: comment, ExpectedVersion: expected}, b, report); err != nil {
 		return core.ReleaseCertificate{}, err
 	}
@@ -89,7 +111,7 @@ func pendingStageIDs(p map[string]core.RetestState) string {
 }
 
 func (s *Service) Evidence(batch core.KilnBatch) ReviewEvidence {
-	report := validation.Evaluate(batch)
+	report := s.reportFor(batch)
 	return BuildEvidenceWithReport(batch, report)
 }
 

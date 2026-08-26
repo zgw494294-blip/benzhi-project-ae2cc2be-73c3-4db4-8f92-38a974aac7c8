@@ -147,7 +147,11 @@ func (s *Server) batchAction(w http.ResponseWriter, r *http.Request) {
 			notFoundJSON(w, fmt.Errorf("批次不存在"))
 			return
 		}
-		writeJSON(w, review.BuildEvidence(b, r.URL.Query().Get("reviewer"), r.URL.Query().Get("decision"), r.URL.Query().Get("comment")))
+		evidence := s.Review.Evidence(b)
+		evidence.Reviewer = r.URL.Query().Get("reviewer")
+		evidence.Decision = r.URL.Query().Get("decision")
+		evidence.Comment = review.NormalizeComment(r.URL.Query().Get("comment"))
+		writeJSON(w, evidence)
 		return
 	}
 	if len(parts) == 2 && parts[1] == "matrix" && r.Method == http.MethodGet {
